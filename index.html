@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2563EB">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Training Platform</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Loading ───────────────────────────────────────────────────────────── -->
+  <div id="screen-loading" class="screen">
+    <div class="center-box">
+      <div class="spinner"></div>
+      <p class="muted small">Loading course...</p>
+    </div>
+  </div>
+
+  <!-- ── Error ─────────────────────────────────────────────────────────────── -->
+  <div id="screen-error" class="screen hidden">
+    <div class="card" style="text-align:center;padding-top:36px">
+      <div class="icon-circle error">✕</div>
+      <h2>Something went wrong</h2>
+      <p id="error-message" class="muted small" style="margin-top:8px"></p>
+    </div>
+  </div>
+
+  <!-- ── Student ID entry ──────────────────────────────────────────────────── -->
+  <div id="screen-id-entry" class="screen hidden">
+    <div class="card">
+      <span id="course-category-badge" class="badge"></span>
+      <h1 id="course-name-title"></h1>
+      <div class="divider"></div>
+      <h2>Enter your Student ID</h2>
+      <p class="muted small" style="margin-top:4px">
+        You'll find this in the WhatsApp message sent to you.
+      </p>
+      <input
+        type="text"
+        id="student-id-input"
+        placeholder="e.g. STU001"
+        maxlength="10"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="characters"
+        spellcheck="false"
+      >
+      <p id="id-field-error" class="field-error hidden"></p>
+      <button id="verify-btn" class="btn primary">Verify &amp; Continue</button>
+    </div>
+  </div>
+
+  <!-- ── Pre-course questionnaire ──────────────────────────────────────────── -->
+  <div id="screen-pre-questions" class="screen hidden">
+    <div class="progress-bar"><div class="fill" style="width:25%"></div></div>
+    <div class="card">
+      <p class="step-label">Step 1 of 3 — Pre-Course Survey</p>
+      <h2>Before we begin</h2>
+      <p class="muted small" style="margin-bottom:18px">
+        Answer these questions honestly. There are no right or wrong answers.
+      </p>
+      <div id="pre-questions-container"></div>
+      <button id="pre-submit-btn" class="btn primary">Continue to Video →</button>
+    </div>
+  </div>
+
+  <!-- ── Video ─────────────────────────────────────────────────────────────── -->
+  <div id="screen-video" class="screen hidden">
+    <div class="progress-bar"><div class="fill" style="width:50%"></div></div>
+    <div class="card">
+      <p class="step-label">Step 2 of 3 — Training Video</p>
+      <h2 id="video-course-name"></h2>
+      <p class="muted small" style="margin-bottom:4px">
+        Watch the full video. The button will unlock when you are done.
+      </p>
+      <div id="yt-player-wrap">
+        <div id="yt-player"></div>
+      </div>
+      <p id="video-watch-status" class="watch-status">Waiting for video to start...</p>
+      <button id="video-done-btn" class="btn primary" disabled>
+        Finish the video to continue
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Post-course questionnaire ─────────────────────────────────────────── -->
+  <div id="screen-post-questions" class="screen hidden">
+    <div class="progress-bar"><div class="fill" style="width:75%"></div></div>
+    <div class="card">
+      <p class="step-label">Step 3 of 3 — Post-Course Survey</p>
+      <h2>Almost done!</h2>
+      <p class="muted small" style="margin-bottom:18px">
+        Now that you have watched the video, please answer these questions.
+      </p>
+      <div id="post-questions-container"></div>
+      <button id="post-submit-btn" class="btn primary">Submit &amp; Complete</button>
+    </div>
+  </div>
+
+  <!-- ── Submitting ────────────────────────────────────────────────────────── -->
+  <div id="screen-submitting" class="screen hidden">
+    <div class="center-box">
+      <div class="spinner"></div>
+      <p class="muted small">Saving your responses...</p>
+    </div>
+  </div>
+
+  <!-- ── Completion ────────────────────────────────────────────────────────── -->
+  <div id="screen-completion" class="screen hidden">
+    <div class="progress-bar"><div class="fill" style="width:100%"></div></div>
+
+    <div class="card" style="text-align:center">
+      <div class="icon-circle success">✓</div>
+      <h2>Course Complete!</h2>
+      <p class="muted small" style="margin-top:6px">
+        Well done, <strong id="completion-name"></strong>!<br>
+        You have completed <strong id="completion-course"></strong>.
+      </p>
+      <div class="info-chip" id="completion-school"></div>
+    </div>
+
+    <div class="card" id="completed-courses-section">
+      <h3>Your Completed Courses</h3>
+      <div id="completed-courses-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="sheets.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
