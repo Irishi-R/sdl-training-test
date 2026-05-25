@@ -28,5 +28,6 @@ const SheetsAPI = {
   verifyStudent:      (studentId) => apiGet('verifyStudent', { studentId }),
   getCourse:          (courseId)  => apiGet('getCourse', { courseId }),
   getCompletedCourses:(studentId) => apiGet('getCompletedCourses', { studentId }),
+  getAllCourses:       ()          => apiGet('getAllCourses'),
   saveResponse:       (data)      => apiPost({ action: 'saveResponse', ...data })
 };
