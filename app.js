@@ -12,7 +12,8 @@ const state = {
   pollInterval:  null,
   fallbackTimer: null,
   playStarted:   false,
-  videoWatched:  false
+  videoWatched:  false,
+  videoPercent:  0
 };
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -343,6 +344,7 @@ function startVideoPolling() {
       if (duration > 0) {
         apiFails = 0;
         const pct = Math.min(99, Math.floor((current / duration) * 100));
+        state.videoPercent = pct;
         setWatchStatus(pct < 95
           ? `${pct}% watched — please finish the video`
           : 'Almost done...'
@@ -367,6 +369,7 @@ function startVideoPolling() {
 function onVideoComplete() {
   if (state.videoWatched) return;
   state.videoWatched = true;
+  if (state.videoPercent >= 95) state.videoPercent = 100;
   clearInterval(state.pollInterval);
   clearTimeout(state.fallbackTimer);
 
@@ -413,7 +416,8 @@ async function submitResponse() {
     courseName:   state.course.name,
     category:     state.course.category,
     preAnswers:   state.preAnswers,
-    postAnswers:  state.postAnswers
+    postAnswers:  state.postAnswers,
+    videoPercent: state.videoPercent
   };
 
   // Cache answers locally so they survive a network blip
