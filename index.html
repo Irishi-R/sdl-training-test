@@ -75,10 +75,13 @@
       <p class="step-label">Step 2 of 3 — Training Video</p>
       <h2 id="video-course-name"></h2>
       <p class="muted small" style="margin-bottom:4px">
-        Watch the full video. The button will unlock when you are done.
+        Tap the video to play or pause. The button below unlocks when you are done.
       </p>
       <div id="yt-player-wrap">
         <div id="yt-player"></div>
+        <div id="video-overlay" class="video-overlay paused">
+          <div class="play-pause-btn" id="play-pause-btn">▶</div>
+        </div>
       </div>
       <p id="video-watch-status" class="watch-status">Waiting for video to start...</p>
       <button id="video-done-btn" class="btn primary" disabled>

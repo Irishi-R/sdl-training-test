@@ -393,6 +393,40 @@ input[type="text"]:focus { border-color: var(--blue); }
   height: 100%;
 }
 
+.video-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .25s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.video-overlay.paused  { background: rgba(0, 0, 0, .42); }
+.video-overlay.playing { background: transparent; }
+
+.play-pause-btn {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  color: var(--blue);
+  pointer-events: none;
+  transition: opacity .25s, transform .15s;
+  padding-left: 4px; /* optical centre for ▶ */
+}
+
+.video-overlay.playing .play-pause-btn { opacity: 0; }
+
+.video-overlay:active .play-pause-btn  { transform: scale(.9); }
+
 .watch-status {
   font-size: .8rem;
   color: var(--muted);

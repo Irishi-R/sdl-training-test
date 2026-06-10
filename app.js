@@ -298,7 +298,7 @@ function initYouTubePlayer(videoUrl) {
 
   state.ytPlayer = new YT.Player('yt-player', {
     videoId,
-    playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+    playerVars: { rel: 0, modestbranding: 1, playsinline: 1, controls: 0 },
     events: {
       onStateChange: onPlayerStateChange,
       onError:       onPlayerError
@@ -307,16 +307,33 @@ function initYouTubePlayer(videoUrl) {
 }
 
 function onPlayerStateChange(event) {
-  // 1 = PLAYING, 0 = ENDED
-  if (event.data === 1 && !state.playStarted) {
-    state.playStarted = true;
-    setWatchStatus('0% watched — please finish the video');
-    startVideoPolling();
+  const overlay = document.getElementById('video-overlay');
+  const btn     = document.getElementById('play-pause-btn');
+
+  if (event.data === 1) { // PLAYING
+    overlay.className = 'video-overlay playing';
+    btn.textContent   = '⏸';
+    if (!state.playStarted) {
+      state.playStarted = true;
+      setWatchStatus('0% watched — please finish the video');
+      startVideoPolling();
+    }
+  } else if (event.data === 2 || event.data === -1 || event.data === 5) { // PAUSED / UNSTARTED / CUED
+    overlay.className = 'video-overlay paused';
+    btn.textContent   = '▶';
   }
-  if (event.data === 0) {
-    // ENDED event fired (works reliably on Android + desktop)
+
+  if (event.data === 0) { // ENDED
+    overlay.className = 'video-overlay playing'; // hide overlay cleanly
     onVideoComplete();
   }
+}
+
+function togglePlayPause() {
+  if (!state.ytPlayer) return;
+  state.ytPlayer.getPlayerState() === 1
+    ? state.ytPlayer.pauseVideo()
+    : state.ytPlayer.playVideo();
 }
 
 function onPlayerError() {
@@ -521,6 +538,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('pre-submit-btn')
     .addEventListener('click', submitPreQuestions);
+
+  document.getElementById('video-overlay')
+    .addEventListener('click', togglePlayPause);
 
   document.getElementById('video-done-btn')
     .addEventListener('click', showPostQuestions);
