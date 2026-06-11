@@ -40,6 +40,31 @@ body {
   padding-bottom: max(24px, env(safe-area-inset-bottom));
 }
 
+/* ── Top nav ───────────────────────────────────────────────────────────────── */
+
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255,255,255,.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+}
+
+.top-nav.hidden { display: none !important; }
+
+.top-nav-link {
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ── Screens ───────────────────────────────────────────────────────────────── */
 
 .screen { animation: fadeUp .22s ease both; }

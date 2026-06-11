@@ -29,6 +29,7 @@ const SheetsAPI = {
   getCourse:          (courseId)  => apiGet('getCourse', { courseId }),
   getCompletedCourses:(studentId) => apiGet('getCompletedCourses', { studentId }),
   getAllCourses:       ()          => apiGet('getAllCourses'),
-  saveStarted:        (data)      => apiPost({ action: 'saveStarted',   ...data }),
-  saveCompleted:      (data)      => apiPost({ action: 'saveCompleted', ...data })
+  saveStarted:           (data) => apiPost({ action: 'saveStarted',        ...data }),
+  saveCompleted:         (data) => apiPost({ action: 'saveCompleted',      ...data }),
+  updateVideoProgress:   (data) => apiPost({ action: 'updateVideoProgress', ...data }).catch(() => {})
 };

@@ -40,8 +40,9 @@ function doPost(e) {
     var data = JSON.parse(e.postData.contents);
     if (data.secret !== SECRET_KEY) return out({success: false, error: 'Unauthorized'});
 
-    if (data.action === 'saveStarted')   return out(saveStarted(data));
-    if (data.action === 'saveCompleted') return out(saveCompleted(data));
+    if (data.action === 'saveStarted')        return out(saveStarted(data));
+    if (data.action === 'saveCompleted')      return out(saveCompleted(data));
+    if (data.action === 'updateVideoProgress') return out(updateVideoProgress(data));
 
     return out({success: false, error: 'Unknown action: ' + data.action});
   } catch (err) {
@@ -264,6 +265,26 @@ function saveCompleted(data) {
   ]);
 
   return {success: true, submissionId: subId, fallback: true};
+}
+
+// ─── updateVideoProgress ─────────────────────────────────────────────────────
+// Called every 30s during video and on tab hide. Updates Video % on the Started row.
+
+function updateVideoProgress(data) {
+  if (!data.submissionId) return {success: false};
+
+  var sheet = getSheet(SHEET_TRACKING);
+  var rows  = sheet.getDataRange().getValues();
+
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.submissionId)) {
+      sheet.getRange(i + 1, 12).setValue(
+        data.videoPercent !== undefined ? data.videoPercent + '%' : ''
+      );
+      return {success: true};
+    }
+  }
+  return {success: false, error: 'Row not found'};
 }
 
 // ─── getCompletedCourses ──────────────────────────────────────────────────────

@@ -3,76 +3,167 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#2563EB">
+  <meta name="theme-color" content="#1e40af">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow">
-  <title>Training Courses</title>
+  <title>SDL Training</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    .home-header {
-      background: var(--blue);
-      padding: 28px 20px 22px;
+    /* ── Hero ────────────────────────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(145deg, #1e3a8a 0%, #1d4ed8 55%, #3b82f6 100%);
+      padding: max(36px, calc(env(safe-area-inset-top) + 24px)) 22px 28px;
+      color: #fff;
     }
-    .home-header h1 { color: #fff; font-size: 1.3rem; }
-    .home-header p  { color: rgba(255,255,255,.75); font-size: .875rem; margin-top: 4px; }
 
-    .catalog-body { padding: 6px 14px 32px; }
+    .hero-brand {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      margin-bottom: 20px;
+    }
 
-    .cat-section  { margin-bottom: 8px; }
+    .hero-logo {
+      width: 50px;
+      height: 50px;
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      backdrop-filter: blur(10px);
+      flex-shrink: 0;
+    }
 
-    .cat-heading {
-      font-size: .7rem;
+    .hero-org  { font-size: .78rem; color: rgba(255,255,255,.65); font-weight: 500; margin-bottom: 2px; }
+    .hero-name { font-size: 1.45rem; font-weight: 800; color: #fff; letter-spacing: -.02em; line-height: 1; }
+
+    .hero-tagline {
+      font-size: .9375rem;
+      color: rgba(255,255,255,.8);
+      line-height: 1.55;
+      margin-bottom: 18px;
+    }
+
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(255,255,255,.16);
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: .8rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .hero-dot {
+      width: 7px;
+      height: 7px;
+      background: #4ade80;
+      border-radius: 50%;
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .4; }
+    }
+
+    /* ── Body ────────────────────────────────────────────────────────────────── */
+    .catalog-body { padding: 6px 14px 48px; }
+
+    /* ── Category section ────────────────────────────────────────────────────── */
+    .cat-section { margin-top: 22px; }
+
+    .cat-header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 2px;
+      margin-bottom: 11px;
+    }
+
+    .cat-icon-wrap {
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .95rem;
+      flex-shrink: 0;
+    }
+
+    .cat-label-text {
+      font-size: .8125rem;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: var(--muted);
-      padding: 16px 4px 8px;
+      color: var(--text);
+      letter-spacing: -.01em;
     }
 
+    .cat-count {
+      margin-left: auto;
+      font-size: .75rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    /* ── Course card ─────────────────────────────────────────────────────────── */
     .course-card {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+      gap: 14px;
       background: var(--white);
       border-radius: var(--radius);
-      padding: 16px 16px;
+      padding: 15px 15px 15px 18px;
       margin-bottom: 10px;
       box-shadow: var(--shadow);
       text-decoration: none;
       color: inherit;
-      transition: transform .15s;
+      border-left: 4px solid transparent;
+      transition: transform .15s, box-shadow .15s;
       -webkit-tap-highlight-color: transparent;
     }
-    .course-card:active { transform: scale(.98); }
 
-    .course-info { flex: 1; min-width: 0; }
-    .course-name {
-      font-size: .9375rem;
-      font-weight: 600;
-      color: var(--text);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .course-cat {
-      font-size: .8rem;
-      color: var(--muted);
-      margin-top: 2px;
-    }
+    .course-card:active { transform: scale(.98); box-shadow: none; }
 
-    .go-btn {
-      background: var(--blue);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: 9px 14px;
-      font-size: .8125rem;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-      white-space: nowrap;
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
       flex-shrink: 0;
-      pointer-events: none; /* card handles the tap */
+    }
+
+    .card-body    { flex: 1; min-width: 0; }
+    .card-name    { font-size: .9375rem; font-weight: 700; color: var(--text); line-height: 1.35; margin-bottom: 3px; }
+    .card-cat     { font-size: .775rem; color: var(--muted); font-weight: 500; }
+
+    .card-arrow {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .875rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────────────── */
+    .home-footer {
+      text-align: center;
+      padding: 4px 20px 24px;
+      font-size: .75rem;
+      color: var(--muted);
     }
   </style>
 </head>
@@ -98,11 +189,28 @@
 
   <!-- Catalog -->
   <div id="screen-catalog" class="screen hidden">
-    <div class="home-header">
-      <h1>Training Courses</h1>
-      <p>Tap a course to get started</p>
+
+    <div class="hero">
+      <div class="hero-brand">
+        <div class="hero-logo">📚</div>
+        <div>
+          <p class="hero-org">SDL Academy</p>
+          <p class="hero-name">Training Hub</p>
+        </div>
+      </div>
+      <p class="hero-tagline">
+        Complete your assigned courses to build your skills and earn recognition.
+      </p>
+      <div class="hero-pill">
+        <div class="hero-dot"></div>
+        <span id="course-count">Loading...</span>
+      </div>
     </div>
+
     <div class="catalog-body" id="catalog-body"></div>
+
+    <div class="home-footer">SDL Training Platform &nbsp;·&nbsp; Authorized students only</div>
+
   </div>
 
 </div>
@@ -110,14 +218,22 @@
 <script src="config.js"></script>
 <script src="sheets.js"></script>
 <script>
+  const CAT = {
+    'Safety Training':  { color: '#EF4444', bg: '#FEF2F2', icon: '🛡️' },
+    'Soft Skills':      { color: '#3B82F6', bg: '#EFF6FF', icon: '💬' },
+    'Technical Skills': { color: '#10B981', bg: '#ECFDF5', icon: '⚙️' },
+  };
+  const DEFAULT_CAT = { color: '#8B5CF6', bg: '#F5F3FF', icon: '📖' };
+
+  function cat(name) { return CAT[name] || DEFAULT_CAT; }
+
   function showScreen(name) {
     document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
     document.getElementById('screen-' + name).classList.remove('hidden');
   }
 
-  function esc(str) {
-    return String(str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   async function init() {
@@ -134,6 +250,9 @@
   }
 
   function render(courses) {
+    document.getElementById('course-count').textContent =
+      courses.length + ' Course' + (courses.length !== 1 ? 's' : '') + ' Available';
+
     const grouped = {};
     courses.forEach(c => {
       if (!grouped[c.category]) grouped[c.category] = [];
@@ -144,20 +263,29 @@
     body.innerHTML = '';
 
     Object.entries(grouped).forEach(([category, items]) => {
+      const cfg     = cat(category);
       const section = document.createElement('div');
       section.className = 'cat-section';
-      section.innerHTML = `<div class="cat-heading">${esc(category)}</div>`;
+
+      section.innerHTML = `
+        <div class="cat-header">
+          <div class="cat-icon-wrap" style="background:${cfg.bg};color:${cfg.color}">${cfg.icon}</div>
+          <span class="cat-label-text">${esc(category)}</span>
+          <span class="cat-count">${items.length} course${items.length !== 1 ? 's' : ''}</span>
+        </div>`;
 
       items.forEach(course => {
-        const a = document.createElement('a');
+        const a    = document.createElement('a');
         a.className = 'course-card';
-        a.href = `index.html?course=${encodeURIComponent(course.id)}`;
+        a.href      = `index.html?course=${encodeURIComponent(course.id)}`;
+        a.style.borderLeftColor = cfg.color;
         a.innerHTML = `
-          <div class="course-info">
-            <div class="course-name">${esc(course.name)}</div>
-            <div class="course-cat">${esc(category)}</div>
+          <div class="card-icon" style="background:${cfg.bg};color:${cfg.color}">${cfg.icon}</div>
+          <div class="card-body">
+            <div class="card-name">${esc(course.name)}</div>
+            <div class="card-cat">${esc(category)}</div>
           </div>
-          <button class="go-btn">Start →</button>`;
+          <div class="card-arrow" style="background:${cfg.bg};color:${cfg.color}">→</div>`;
         section.appendChild(a);
       });
 

@@ -15,7 +15,8 @@ const state = {
   fallbackTimer: null,
   playStarted:   false,
   videoWatched:  false,
-  videoPercent:  0
+  videoPercent:  0,
+  syncInterval:  null
 };
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -40,8 +41,9 @@ async function init() {
       return;
     }
     state.course = result.course;
-    document.getElementById('course-name-title').textContent    = state.course.name;
+    document.getElementById('course-name-title').textContent     = state.course.name;
     document.getElementById('course-category-badge').textContent = state.course.category;
+    document.getElementById('top-nav').classList.remove('hidden');
     showScreen('id-entry');
   } catch (e) {
     showError('Could not connect to the server. Please check your internet and try again.');
@@ -395,6 +397,13 @@ function onPlayerError() {
 function startVideoPolling() {
   let apiFails = 0;
 
+  // Sync video % to backend every 30s so dropouts show their last known progress
+  state.syncInterval = setInterval(() => {
+    if (state.submissionId && !state.videoWatched) {
+      SheetsAPI.updateVideoProgress({ submissionId: state.submissionId, videoPercent: state.videoPercent });
+    }
+  }, 30000);
+
   state.pollInterval = setInterval(() => {
     if (!state.ytPlayer || state.videoWatched) { clearInterval(state.pollInterval); return; }
 
@@ -429,6 +438,7 @@ function onVideoComplete() {
   state.videoWatched = true;
   if (state.videoPercent >= 95) state.videoPercent = 100;
   clearInterval(state.pollInterval);
+  clearInterval(state.syncInterval);
   clearTimeout(state.fallbackTimer);
 
   const btn       = document.getElementById('video-done-btn');
@@ -576,6 +586,31 @@ document.addEventListener('DOMContentLoaded', () => {
     .addEventListener('click', resumeFromSaved);
   document.getElementById('resume-fresh-btn')
     .addEventListener('click', startFresh);
+
+  // Save video % to backend when student switches app / locks screen / closes tab
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden') return;
+    if (!state.submissionId || !state.playStarted || state.videoWatched) return;
+
+    const body = JSON.stringify({
+      action: 'updateVideoProgress',
+      secret: CONFIG.SECRET_KEY,
+      submissionId: state.submissionId,
+      videoPercent: state.videoPercent
+    });
+
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(CONFIG.APPS_SCRIPT_URL, new Blob([body], { type: 'text/plain' }));
+    } else {
+      fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body,
+        keepalive: true,
+        redirect: 'follow'
+      }).catch(() => {});
+    }
+  });
 
   init();
 });
