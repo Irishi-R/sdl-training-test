@@ -8,6 +8,8 @@ const state = {
   course:        null,
   preAnswers:    [],
   postAnswers:   [],
+  submissionId:  null,
+  resumed:       false,
   ytPlayer:      null,
   pollInterval:  null,
   fallbackTimer: null,
@@ -26,7 +28,6 @@ async function init() {
     showError('No course link detected. Please use the full link sent to you on WhatsApp.');
     return;
   }
-
   if (!CONFIG.APPS_SCRIPT_URL || CONFIG.APPS_SCRIPT_URL.includes('YOUR_')) {
     showError('Platform not yet configured. Please contact your administrator.');
     return;
@@ -39,7 +40,7 @@ async function init() {
       return;
     }
     state.course = result.course;
-    document.getElementById('course-name-title').textContent   = state.course.name;
+    document.getElementById('course-name-title').textContent    = state.course.name;
     document.getElementById('course-category-badge').textContent = state.course.category;
     showScreen('id-entry');
   } catch (e) {
@@ -63,25 +64,23 @@ function showError(msg) {
 // ─── Student ID verification ──────────────────────────────────────────────────
 
 async function verifyStudentId() {
-  const input   = document.getElementById('student-id-input');
-  const errorEl = document.getElementById('id-field-error');
-  const btn     = document.getElementById('verify-btn');
+  const input     = document.getElementById('student-id-input');
+  const errorEl   = document.getElementById('id-field-error');
+  const btn       = document.getElementById('verify-btn');
   const studentId = input.value.trim().toUpperCase();
 
-  if (!studentId) {
-    setFieldError(errorEl, 'Please enter your Student ID.');
-    return;
-  }
+  if (!studentId) { setFieldError(errorEl, 'Please enter your Student ID.'); return; }
 
-  btn.disabled     = true;
-  btn.textContent  = 'Verifying...';
+  btn.disabled    = true;
+  btn.textContent = 'Verifying...';
   clearFieldError(errorEl);
 
   try {
     const result = await SheetsAPI.verifyStudent(studentId);
     if (result.success) {
       state.student = result.student;
-      showPreQuestions();
+      const saved   = getSavedProgress();
+      saved ? showResumeScreen(saved) : showPreQuestions();
     } else {
       setFieldError(errorEl, 'Student ID not found. Please check and try again.');
       btn.disabled    = false;
@@ -95,6 +94,64 @@ async function verifyStudentId() {
   }
 }
 
+// ─── Resume flow ──────────────────────────────────────────────────────────────
+
+function getSavedProgress() {
+  try {
+    const raw = localStorage.getItem(`sdl_progress_${state.courseId}`);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (saved.studentId !== state.student.id) return null;
+    return saved;
+  } catch (e) { return null; }
+}
+
+let _savedProgress = null;
+
+function showResumeScreen(saved) {
+  _savedProgress = saved;
+  document.getElementById('resume-percent').textContent     = (saved.videoPercent || 0) + '%';
+  document.getElementById('resume-course-name').textContent = state.course.name;
+  showScreen('resume');
+}
+
+function resumeFromSaved() {
+  if (!_savedProgress) return;
+  state.preAnswers   = _savedProgress.preAnswers   || [];
+  state.submissionId = _savedProgress.submissionId || null;
+  state.resumed      = true;
+  const t = _savedProgress.videoTime || 0;
+  _savedProgress     = null;
+  showVideoScreen(t);
+}
+
+function startFresh() {
+  clearSavedProgress();
+  _savedProgress = null;
+  showPreQuestions();
+}
+
+function saveProgressLocally() {
+  try {
+    localStorage.setItem(`sdl_progress_${state.courseId}`, JSON.stringify({
+      studentId:    state.student  ? state.student.id : null,
+      courseId:     state.courseId,
+      submissionId: state.submissionId,
+      preAnswers:   state.preAnswers,
+      videoTime:    state.ytPlayer ? (state.ytPlayer.getCurrentTime() || 0) : 0,
+      videoPercent: state.videoPercent,
+      savedAt:      Date.now()
+    }));
+  } catch (e) { /* localStorage unavailable — ignore */ }
+}
+
+function clearSavedProgress() {
+  try {
+    localStorage.removeItem(`sdl_progress_${state.courseId}`);
+    localStorage.removeItem('sdl_pending');
+  } catch (e) {}
+}
+
 // ─── Question rendering ───────────────────────────────────────────────────────
 
 function renderQuestions(questions, container, prefix) {
@@ -103,9 +160,9 @@ function renderQuestions(questions, container, prefix) {
   questions.forEach((q, i) => {
     const fieldName = `${prefix}_q${i + 1}`;
     const div = document.createElement('div');
-    div.className      = 'question-block';
-    div.dataset.index  = i;
-    div.dataset.type   = q.type;
+    div.className     = 'question-block';
+    div.dataset.index = i;
+    div.dataset.type  = q.type;
 
     let inputsHtml = '';
 
@@ -146,7 +203,6 @@ function renderQuestions(questions, container, prefix) {
     container.appendChild(div);
   });
 
-  // Visual feedback: highlight selected options
   container.querySelectorAll('.option-label input').forEach(input => {
     input.addEventListener('change', function () {
       if (this.type === 'radio') {
@@ -157,7 +213,6 @@ function renderQuestions(questions, container, prefix) {
     });
   });
 
-  // Rating buttons
   container.querySelectorAll('.rating-row').forEach(row => {
     row.querySelectorAll('.rating-btn').forEach(btn => {
       btn.addEventListener('click', function () {
@@ -172,7 +227,6 @@ function renderQuestions(questions, container, prefix) {
 function collectAnswers(container, questions, prefix) {
   return questions.map((q, i) => {
     const fieldName = `${prefix}_q${i + 1}`;
-
     if (q.type === 'mcq') {
       const el = container.querySelector(`input[name="${fieldName}"]:checked`);
       return el ? el.value : '';
@@ -194,25 +248,17 @@ function collectAnswers(container, questions, prefix) {
 }
 
 function validateAnswers(container, questions, prefix) {
-  let valid        = true;
-  let firstInvalid = null;
+  let valid = true, firstInvalid = null;
 
   questions.forEach((q, i) => {
     const fieldName = `${prefix}_q${i + 1}`;
     const errorEl   = document.getElementById(`err_${fieldName}`);
     let answered    = false;
 
-    if (q.type === 'mcq') {
-      answered = !!container.querySelector(`input[name="${fieldName}"]:checked`);
-    } else if (q.type === 'multiselect') {
-      answered = container.querySelectorAll(`input[name="${fieldName}"]:checked`).length > 0;
-    } else if (q.type === 'text') {
-      const el = container.querySelector(`textarea[name="${fieldName}"]`);
-      answered = el && el.value.trim().length > 0;
-    } else if (q.type === 'rating') {
-      const el = document.getElementById(`hidden_${fieldName}`);
-      answered = el && el.value !== '';
-    }
+    if (q.type === 'mcq')         answered = !!container.querySelector(`input[name="${fieldName}"]:checked`);
+    else if (q.type === 'multiselect') answered = container.querySelectorAll(`input[name="${fieldName}"]:checked`).length > 0;
+    else if (q.type === 'text')   { const el = container.querySelector(`textarea[name="${fieldName}"]`); answered = el && el.value.trim().length > 0; }
+    else if (q.type === 'rating') { const el = document.getElementById(`hidden_${fieldName}`); answered = el && el.value !== ''; }
 
     if (!answered) {
       errorEl.classList.remove('hidden');
@@ -230,30 +276,51 @@ function validateAnswers(container, questions, prefix) {
 // ─── Pre-course questions ─────────────────────────────────────────────────────
 
 function showPreQuestions() {
-  renderQuestions(
-    state.course.preQuestions,
-    document.getElementById('pre-questions-container'),
-    'pre'
-  );
+  renderQuestions(state.course.preQuestions, document.getElementById('pre-questions-container'), 'pre');
   showScreen('pre-questions');
 }
 
-function submitPreQuestions() {
+async function submitPreQuestions() {
   const container = document.getElementById('pre-questions-container');
   if (!validateAnswers(container, state.course.preQuestions, 'pre')) return;
+
   state.preAnswers = collectAnswers(container, state.course.preQuestions, 'pre');
-  showVideoScreen();
+
+  const btn       = document.getElementById('pre-submit-btn');
+  btn.disabled    = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    const result = await SheetsAPI.saveStarted({
+      studentId:    state.student.id,
+      studentName:  state.student.name,
+      studentSchool: state.student.school,
+      courseId:     state.course.id,
+      courseName:   state.course.name,
+      category:     state.course.category,
+      preAnswers:   state.preAnswers
+    });
+    state.submissionId = result.success ? result.submissionId : 'LOCAL_' + Date.now();
+  } catch (e) {
+    // Network failure — generate local ID and continue, don't block student
+    state.submissionId = 'LOCAL_' + Date.now();
+  }
+
+  saveProgressLocally();
+  btn.disabled    = false;
+  btn.textContent = 'Continue to Video →';
+  showVideoScreen(0);
 }
 
 // ─── Video screen ─────────────────────────────────────────────────────────────
 
-async function showVideoScreen() {
+async function showVideoScreen(startTime = 0) {
   showScreen('video');
   document.getElementById('video-course-name').textContent = state.course.name;
 
   try {
     await loadYouTubeAPI();
-    initYouTubePlayer(state.course.videoUrl);
+    initYouTubePlayer(state.course.videoUrl, startTime);
   } catch (e) {
     document.getElementById('yt-player-wrap').innerHTML =
       '<p class="video-error">Video could not be loaded. Please check your internet and reload the page.</p>';
@@ -264,19 +331,12 @@ async function showVideoScreen() {
 function loadYouTubeAPI() {
   return new Promise((resolve, reject) => {
     if (window.YT && window.YT.Player) { resolve(); return; }
-
     let settled = false;
-
-    window.onYouTubeIframeAPIReady = () => {
-      settled = true;
-      resolve();
-    };
-
-    const tag  = document.createElement('script');
-    tag.src    = 'https://www.youtube.com/iframe_api';
-    tag.onerror = () => { if (!settled) { settled = true; reject(new Error('YouTube API failed to load')); } };
+    window.onYouTubeIframeAPIReady = () => { settled = true; resolve(); };
+    const tag = document.createElement('script');
+    tag.src   = 'https://www.youtube.com/iframe_api';
+    tag.onerror = () => { if (!settled) { settled = true; reject(new Error('YouTube API failed')); } };
     document.head.appendChild(tag);
-
     setTimeout(() => { if (!settled) { settled = true; reject(new Error('YouTube API timed out')); } }, 12000);
   });
 }
@@ -287,22 +347,21 @@ function extractYouTubeId(url) {
   return m ? m[1] : null;
 }
 
-function initYouTubePlayer(videoUrl) {
+function initYouTubePlayer(videoUrl, startTime = 0) {
   const videoId = extractYouTubeId(videoUrl);
-
   if (!videoId) {
     document.getElementById('yt-player-wrap').innerHTML =
       '<p class="video-error">Video URL is not configured yet. Please contact your administrator.</p>';
     return;
   }
 
+  const playerVars = { rel: 0, modestbranding: 1, playsinline: 1, controls: 0 };
+  if (startTime > 0) playerVars.start = Math.floor(startTime);
+
   state.ytPlayer = new YT.Player('yt-player', {
     videoId,
-    playerVars: { rel: 0, modestbranding: 1, playsinline: 1, controls: 0 },
-    events: {
-      onStateChange: onPlayerStateChange,
-      onError:       onPlayerError
-    }
+    playerVars,
+    events: { onStateChange: onPlayerStateChange, onError: onPlayerError }
   });
 }
 
@@ -318,22 +377,15 @@ function onPlayerStateChange(event) {
       setWatchStatus('0% watched — please finish the video');
       startVideoPolling();
     }
-  } else if (event.data === 2 || event.data === -1 || event.data === 5) { // PAUSED / UNSTARTED / CUED
+  } else if (event.data === 2 || event.data === -1 || event.data === 5) { // PAUSED/UNSTARTED/CUED
     overlay.className = 'video-overlay paused';
     btn.textContent   = '▶';
   }
 
   if (event.data === 0) { // ENDED
-    overlay.className = 'video-overlay playing'; // hide overlay cleanly
+    overlay.className = 'video-overlay playing';
     onVideoComplete();
   }
-}
-
-function togglePlayPause() {
-  if (!state.ytPlayer) return;
-  state.ytPlayer.getPlayerState() === 1
-    ? state.ytPlayer.pauseVideo()
-    : state.ytPlayer.playVideo();
 }
 
 function onPlayerError() {
@@ -341,45 +393,34 @@ function onPlayerError() {
 }
 
 function startVideoPolling() {
-  // Poll every 2 seconds — primary completion detection for all platforms.
-  // Falls back to a timer if getDuration() never returns a valid value (rare iOS edge case).
   let apiFails = 0;
 
   state.pollInterval = setInterval(() => {
-    if (!state.ytPlayer || state.videoWatched) {
-      clearInterval(state.pollInterval);
-      return;
-    }
+    if (!state.ytPlayer || state.videoWatched) { clearInterval(state.pollInterval); return; }
 
     try {
       const current  = state.ytPlayer.getCurrentTime();
       const duration = state.ytPlayer.getDuration();
       const pState   = state.ytPlayer.getPlayerState();
 
-      if (pState === 0) { onVideoComplete(); return; } // ENDED via poll
+      if (pState === 0) { onVideoComplete(); return; }
 
       if (duration > 0) {
         apiFails = 0;
-        const pct = Math.min(99, Math.floor((current / duration) * 100));
+        const pct      = Math.min(99, Math.floor((current / duration) * 100));
         state.videoPercent = pct;
-        setWatchStatus(pct < 95
-          ? `${pct}% watched — please finish the video`
-          : 'Almost done...'
-        );
+        setWatchStatus(pct < 95 ? `${pct}% watched — please finish the video` : 'Almost done...');
+        saveProgressLocally();
         if (current / duration >= 0.95) onVideoComplete();
       } else {
         apiFails++;
-        // After 30 s of no duration data, start a 3-min fallback timer.
-        // This only triggers when the YouTube API is completely non-responsive (rare on iOS).
         if (apiFails === 15) {
           setWatchStatus('Watching...');
           state.fallbackTimer = setTimeout(onVideoComplete, 180000);
           clearInterval(state.pollInterval);
         }
       }
-    } catch (e) {
-      // Player not ready yet — ignore
-    }
+    } catch (e) {}
   }, 2000);
 }
 
@@ -390,7 +431,7 @@ function onVideoComplete() {
   clearInterval(state.pollInterval);
   clearTimeout(state.fallbackTimer);
 
-  const btn = document.getElementById('video-done-btn');
+  const btn       = document.getElementById('video-done-btn');
   btn.disabled    = false;
   btn.textContent = "I've Finished Watching — Continue →";
   btn.classList.add('unlocked');
@@ -401,14 +442,17 @@ function setWatchStatus(msg) {
   document.getElementById('video-watch-status').textContent = msg;
 }
 
+function togglePlayPause() {
+  if (!state.ytPlayer) return;
+  state.ytPlayer.getPlayerState() === 1
+    ? state.ytPlayer.pauseVideo()
+    : state.ytPlayer.playVideo();
+}
+
 // ─── Post-course questions ────────────────────────────────────────────────────
 
 function showPostQuestions() {
-  renderQuestions(
-    state.course.postQuestions,
-    document.getElementById('post-questions-container'),
-    'post'
-  );
+  renderQuestions(state.course.postQuestions, document.getElementById('post-questions-container'), 'post');
   showScreen('post-questions');
 }
 
@@ -426,30 +470,30 @@ async function submitResponse() {
   showScreen('submitting');
 
   const payload = {
-    studentId:    state.student.id,
-    studentName:  state.student.name,
-    studentSchool:state.student.school,
-    courseId:     state.course.id,
-    courseName:   state.course.name,
-    category:     state.course.category,
-    preAnswers:   state.preAnswers,
-    postAnswers:  state.postAnswers,
-    videoPercent: state.videoPercent
+    submissionId:  state.submissionId,
+    studentId:     state.student.id,
+    studentName:   state.student.name,
+    studentSchool: state.student.school,
+    courseId:      state.course.id,
+    courseName:    state.course.name,
+    category:      state.course.category,
+    preAnswers:    state.preAnswers,
+    postAnswers:   state.postAnswers,
+    videoPercent:  state.videoPercent,
+    resumed:       state.resumed
   };
 
-  // Cache answers locally so they survive a network blip
   localStorage.setItem('sdl_pending', JSON.stringify(payload));
 
   try {
-    const result = await SheetsAPI.saveResponse(payload);
+    const result = await SheetsAPI.saveCompleted(payload);
     if (!result.success) throw new Error(result.error || 'Save failed');
-    localStorage.removeItem('sdl_pending');
+    clearSavedProgress();
     await showCompletionScreen();
   } catch (e) {
-    // Show error but don't lose the screen — data is in localStorage
     showError(
       'Your answers could not be saved. Do not close this page. ' +
-      'Please check your internet connection and tap the back button to try submitting again.'
+      'Please check your internet and tap back to try submitting again.'
     );
     btn.disabled    = false;
     btn.textContent = 'Submit & Complete';
@@ -477,10 +521,7 @@ async function showCompletionScreen() {
 }
 
 function renderCompletedCourses(courses) {
-  // Deduplicate: keep first occurrence of each courseId (earliest submission)
-  const seen    = new Set();
-  const grouped = {};
-
+  const seen = new Set(), grouped = {};
   courses.forEach(c => {
     if (seen.has(c.courseId)) return;
     seen.add(c.courseId);
@@ -495,14 +536,12 @@ function renderCompletedCourses(courses) {
     const grp = document.createElement('div');
     grp.className = 'cat-group';
     grp.innerHTML = `<div class="cat-label">${esc(category)}</div>`;
-
     items.forEach(c => {
       const item     = document.createElement('div');
       item.className = 'course-item';
       item.innerHTML = `<span class="tick">✓</span><span>${esc(c.courseName)}</span>`;
       grp.appendChild(item);
     });
-
     list.appendChild(grp);
   });
 }
@@ -511,42 +550,32 @@ function renderCompletedCourses(courses) {
 
 function esc(str) {
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function setFieldError(el, msg) {
-  el.textContent = msg;
-  el.classList.remove('hidden');
-}
-
-function clearFieldError(el) {
-  el.textContent = '';
-  el.classList.add('hidden');
-}
+function setFieldError(el, msg)  { el.textContent = msg; el.classList.remove('hidden'); }
+function clearFieldError(el)     { el.textContent = '';  el.classList.add('hidden');    }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('verify-btn')
     .addEventListener('click', verifyStudentId);
-
   document.getElementById('student-id-input')
     .addEventListener('keydown', e => { if (e.key === 'Enter') verifyStudentId(); });
-
   document.getElementById('pre-submit-btn')
     .addEventListener('click', submitPreQuestions);
-
   document.getElementById('video-overlay')
     .addEventListener('click', togglePlayPause);
-
   document.getElementById('video-done-btn')
     .addEventListener('click', showPostQuestions);
-
   document.getElementById('post-submit-btn')
     .addEventListener('click', submitResponse);
+  document.getElementById('resume-continue-btn')
+    .addEventListener('click', resumeFromSaved);
+  document.getElementById('resume-fresh-btn')
+    .addEventListener('click', startFresh);
 
   init();
 });
