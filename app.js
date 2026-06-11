@@ -459,6 +459,24 @@ function togglePlayPause() {
     : state.ytPlayer.playVideo();
 }
 
+function toggleFullscreen() {
+  const wrap = document.getElementById('yt-player-wrap');
+  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+
+  if (!isFs) {
+    (wrap.requestFullscreen || wrap.webkitRequestFullscreen).call(wrap).catch(() => {});
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  }
+}
+
+function updateFsIcon() {
+  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  document.getElementById('fs-icon').innerHTML = isFs
+    ? '<path d="M5 1v4H1M9 1v4h4M5 13v-4H1M9 13v-4h4"/>'   // compress
+    : '<path d="M1 5V1h4M13 5V1h-4M1 9v4h4M13 9v4h-4"/>';   // expand
+}
+
 // ─── Post-course questions ────────────────────────────────────────────────────
 
 function showPostQuestions() {
@@ -578,6 +596,10 @@ document.addEventListener('DOMContentLoaded', () => {
     .addEventListener('click', submitPreQuestions);
   document.getElementById('video-overlay')
     .addEventListener('click', togglePlayPause);
+  document.getElementById('fs-btn')
+    .addEventListener('click', e => { e.stopPropagation(); toggleFullscreen(); });
+  document.addEventListener('fullscreenchange', updateFsIcon);
+  document.addEventListener('webkitfullscreenchange', updateFsIcon);
   document.getElementById('video-done-btn')
     .addEventListener('click', showPostQuestions);
   document.getElementById('post-submit-btn')
