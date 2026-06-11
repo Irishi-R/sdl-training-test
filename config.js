@@ -12,6 +12,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz1ndFuq9Q7SpgoCdnEyIk4yKuL5pSk_l7w5cVw9QH845hqdTJUjEf1w7Ke66XkVbhc/exec',
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzhb5aFGpL2nT40-mZDiOvRKSKjrCeXrSn3mkO8e1qcUYG2xr6fjpTI3R9iEYS3ZALv/exec',
   SECRET_KEY: 'SDL_DEMO_2024'
 };
