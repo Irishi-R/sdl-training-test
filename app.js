@@ -44,6 +44,18 @@ async function init() {
     document.getElementById('course-name-title').textContent     = state.course.name;
     document.getElementById('course-category-badge').textContent = state.course.category;
     document.getElementById('top-nav').classList.remove('hidden');
+
+    // Auto-verify if we remember this student
+    try {
+      const savedId = localStorage.getItem('sdl_student_id');
+      if (savedId) {
+        document.getElementById('student-id-input').value = savedId;
+        showScreen('id-entry');
+        verifyStudentId();
+        return;
+      }
+    } catch(e) {}
+
     showScreen('id-entry');
   } catch (e) {
     showError('Could not connect to the server. Please check your internet and try again.');
@@ -81,6 +93,7 @@ async function verifyStudentId() {
     const result = await SheetsAPI.verifyStudent(studentId);
     if (result.success) {
       state.student = result.student;
+      try { localStorage.setItem('sdl_student_id', studentId); } catch(e) {}
       const saved   = getSavedProgress();
       saved ? showResumeScreen(saved) : showPreQuestions();
     } else {
