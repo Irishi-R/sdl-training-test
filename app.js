@@ -530,7 +530,7 @@ async function submitResponse() {
     const result = await SheetsAPI.saveCompleted(payload);
     if (!result.success) throw new Error(result.error || 'Save failed');
     clearSavedProgress();
-    await showCompletionScreen();
+    showResultsScreen();
   } catch (e) {
     showError(
       'Your answers could not be saved. Do not close this page. ' +
@@ -539,6 +539,95 @@ async function submitResponse() {
     btn.disabled    = false;
     btn.textContent = 'Submit & Complete';
   }
+}
+
+// ─── Results screen ───────────────────────────────────────────────────────────
+
+function gradeAnswers(questions, answers) {
+  return questions.map((q, i) => {
+    const answer = answers[i] || '';
+    if (!q.correctAnswer || q.type === 'text' || q.type === 'rating') {
+      return { q, answer, type: 'open' };
+    }
+    let isCorrect = false;
+    if (q.type === 'mcq') {
+      isCorrect = answer.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase();
+    } else if (q.type === 'multiselect') {
+      const correctSet = q.correctAnswer.split('|').map(s => s.trim()).filter(Boolean).sort();
+      const studentSet = answer.split('|').map(s => s.trim()).filter(Boolean).sort();
+      isCorrect = correctSet.length > 0 && JSON.stringify(correctSet) === JSON.stringify(studentSet);
+    }
+    return { q, answer, isCorrect, type: 'graded' };
+  });
+}
+
+function showResultsScreen() {
+  const results = gradeAnswers(state.course.postQuestions, state.postAnswers);
+  const graded  = results.filter(r => r.type === 'graded');
+  const correct = graded.filter(r => r.isCorrect).length;
+  const total   = graded.length;
+  const pct     = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+  const scoreBox = document.getElementById('results-score-box');
+  scoreBox.className = 'score-box ' + (pct >= 70 ? 'score-good' : pct >= 50 ? 'score-ok' : 'score-low');
+  scoreBox.innerHTML = total > 0
+    ? `<div class="score-number">${correct} / ${total}</div><div class="score-label">questions correct</div>`
+    : `<div class="score-number">✓</div><div class="score-label">Responses recorded</div>`;
+
+  const container = document.getElementById('results-container');
+  container.innerHTML = '';
+
+  results.forEach((r, i) => {
+    const div = document.createElement('div');
+    div.className = 'result-item';
+
+    if (r.type === 'open') {
+      div.innerHTML = `
+        <div class="result-header open">
+          <div class="result-badge open">📝</div>
+          <span class="result-qnum">Q${i + 1} — Open Response</span>
+        </div>
+        <p class="result-qtext">${esc(r.q.text)}</p>
+        <div class="result-answer open">
+          <span class="result-label">Your response</span>
+          <span class="result-value">${esc(r.answer) || '—'}</span>
+        </div>`;
+
+    } else if (r.isCorrect) {
+      div.innerHTML = `
+        <div class="result-header correct">
+          <div class="result-badge correct">✓</div>
+          <span class="result-qnum">Q${i + 1} — Correct</span>
+        </div>
+        <p class="result-qtext">${esc(r.q.text)}</p>
+        <div class="result-answer correct">
+          <span class="result-label">Your answer</span>
+          <span class="result-value">${esc(r.answer)}</span>
+        </div>
+        ${r.q.rationale ? `<div class="result-rationale"><span class="rationale-icon">💡</span>${esc(r.q.rationale)}</div>` : ''}`;
+
+    } else {
+      div.innerHTML = `
+        <div class="result-header incorrect">
+          <div class="result-badge incorrect">✗</div>
+          <span class="result-qnum">Q${i + 1} — Incorrect</span>
+        </div>
+        <p class="result-qtext">${esc(r.q.text)}</p>
+        <div class="result-answer incorrect">
+          <span class="result-label">Your answer</span>
+          <span class="result-value">${esc(r.answer) || '—'}</span>
+        </div>
+        <div class="result-answer correct-answer">
+          <span class="result-label">Correct answer</span>
+          <span class="result-value">${esc(r.q.correctAnswer)}</span>
+        </div>
+        ${r.q.rationale ? `<div class="result-rationale"><span class="rationale-icon">💡</span>${esc(r.q.rationale)}</div>` : ''}`;
+    }
+
+    container.appendChild(div);
+  });
+
+  showScreen('results');
 }
 
 // ─── Completion ───────────────────────────────────────────────────────────────
@@ -621,6 +710,8 @@ document.addEventListener('DOMContentLoaded', () => {
     .addEventListener('click', resumeFromSaved);
   document.getElementById('resume-fresh-btn')
     .addEventListener('click', startFresh);
+  document.getElementById('results-continue-btn')
+    .addEventListener('click', () => showCompletionScreen());
 
   // Save video % to backend when student switches app / locks screen / closes tab
   document.addEventListener('visibilitychange', () => {
