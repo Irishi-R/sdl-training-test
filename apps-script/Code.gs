@@ -40,8 +40,8 @@ function doPost(e) {
     var data = JSON.parse(e.postData.contents);
     if (data.secret !== SECRET_KEY) return out({success: false, error: 'Unauthorized'});
 
-    if (data.action === 'saveStarted')        return out(saveStarted(data));
-    if (data.action === 'saveCompleted')      return out(saveCompleted(data));
+    if (data.action === 'saveStarted')         return out(saveStarted(data));
+    if (data.action === 'saveCompleted')       return out(saveCompleted(data));
     if (data.action === 'updateVideoProgress') return out(updateVideoProgress(data));
 
     return out({success: false, error: 'Unknown action: ' + data.action});
@@ -89,16 +89,11 @@ function verifyStudent(studentId) {
 }
 
 // ─── getCourse ────────────────────────────────────────────────────────────────
-// Column layout (0-indexed):
-//   0  Course ID          1  Category           2  Course Name        3  Video URL
-//   4  Pre Q1 Text        5  Pre Q1 Type        6  Pre Q1 Options
-//   7  Pre Q2 Text        8  Pre Q2 Type        9  Pre Q2 Options
-//   10 Pre Q3 Text        11 Pre Q3 Type        12 Pre Q3 Options
-//   13 Pre Q4 Text        14 Pre Q4 Type        15 Pre Q4 Options
-//   16 Post Q1 Text       17 Post Q1 Type       18 Post Q1 Options
-//   19 Post Q2 Text       20 Post Q2 Type       21 Post Q2 Options
-//   22 Post Q3 Text       23 Post Q3 Type       24 Post Q3 Options
-//   25 Post Q4 Text       26 Post Q4 Type       27 Post Q4 Options
+// Column layout (0-indexed), 5 columns per question:
+//   0   Course ID       1   Category        2   Course Name     3   Video URL
+//   Pre  Q(i) base = 4  + i*5  → Text, Type, Options, Correct, Rationale
+//   Post Q(i) base = 24 + i*5  → Text, Type, Options, Correct, Rationale
+//   Total: 44 columns
 
 function getCourse(courseId) {
   if (!courseId) return {success: false, error: 'Course ID is required'};
@@ -114,25 +109,25 @@ function getCourse(courseId) {
     var post = [];
 
     for (var q = 0; q < 4; q++) {
-      var pOff = 4  + q * 3;
-      var rOff = 16 + q * 3;
+      var pOff = 4  + q * 5;
+      var rOff = 24 + q * 5;
 
       if (row[pOff]) {
         pre.push({
-          text:    String(row[pOff]),
-          type:    String(row[pOff + 1]).trim().toLowerCase(),
-          options: row[pOff + 2]
-            ? String(row[pOff + 2]).split('|').map(function(s){ return s.trim(); }).filter(Boolean)
-            : []
+          text:          String(row[pOff]),
+          type:          String(row[pOff + 1]).trim().toLowerCase(),
+          options:       row[pOff + 2] ? String(row[pOff + 2]).split('|').map(function(s){ return s.trim(); }).filter(Boolean) : [],
+          correctAnswer: String(row[pOff + 3] || '').trim(),
+          rationale:     String(row[pOff + 4] || '').trim()
         });
       }
       if (row[rOff]) {
         post.push({
-          text:    String(row[rOff]),
-          type:    String(row[rOff + 1]).trim().toLowerCase(),
-          options: row[rOff + 2]
-            ? String(row[rOff + 2]).split('|').map(function(s){ return s.trim(); }).filter(Boolean)
-            : []
+          text:          String(row[rOff]),
+          type:          String(row[rOff + 1]).trim().toLowerCase(),
+          options:       row[rOff + 2] ? String(row[rOff + 2]).split('|').map(function(s){ return s.trim(); }).filter(Boolean) : [],
+          correctAnswer: String(row[rOff + 3] || '').trim(),
+          rationale:     String(row[rOff + 4] || '').trim()
         });
       }
     }
@@ -164,13 +159,13 @@ function getCourse(courseId) {
 //  Col 8  (idx 7)  Category
 //  Col 9  (idx 8)  Started At
 //  Col 10 (idx 9)  Completed At
-//  Col 11 (idx 10) Resumed          — Yes | No  (blank while Started)
-//  Col 12 (idx 11) Video % Watched  (blank while Started)
+//  Col 11 (idx 10) Resumed          — Yes | No
+//  Col 12 (idx 11) Video % Watched
 //  Col 13 (idx 12) Pre Q1
 //  Col 14 (idx 13) Pre Q2
 //  Col 15 (idx 14) Pre Q3
 //  Col 16 (idx 15) Pre Q4
-//  Col 17 (idx 16) Post Q1          (blank while Started)
+//  Col 17 (idx 16) Post Q1
 //  Col 18 (idx 17) Post Q2
 //  Col 19 (idx 18) Post Q3
 //  Col 20 (idx 19) Post Q4
@@ -188,7 +183,6 @@ function ensureTrackingHeaders(sheet) {
 }
 
 // ─── saveStarted ─────────────────────────────────────────────────────────────
-// Called when student submits the pre-assessment. Creates a "Started" row.
 
 function saveStarted(data) {
   var sheet = getSheet(SHEET_TRACKING);
@@ -211,8 +205,6 @@ function saveStarted(data) {
 }
 
 // ─── saveCompleted ────────────────────────────────────────────────────────────
-// Called on final submission. Finds the "Started" row by submissionId and
-// updates it to "Completed". Falls back to appending a full row if not found.
 
 function saveCompleted(data) {
   var sheet = getSheet(SHEET_TRACKING);
@@ -223,7 +215,6 @@ function saveCompleted(data) {
   var pre  = data.preAnswers  || [];
   var pct  = (data.videoPercent !== undefined) ? data.videoPercent + '%' : '';
 
-  // Find the row matching the submissionId
   if (data.submissionId && !String(data.submissionId).startsWith('LOCAL_')) {
     var rows = sheet.getDataRange().getValues();
     for (var i = 1; i < rows.length; i++) {
@@ -233,7 +224,6 @@ function saveCompleted(data) {
         try {
           var rowRange  = sheet.getRange(i + 1, 1, 1, 20);
           var rowValues = rowRange.getValues()[0];
-
           rowValues[1]  = 'Completed';
           rowValues[9]  = ts;
           rowValues[10] = data.resumed ? 'Yes' : 'No';
@@ -242,7 +232,6 @@ function saveCompleted(data) {
           rowValues[17] = post[1] || '';
           rowValues[18] = post[2] || '';
           rowValues[19] = post[3] || '';
-
           rowRange.setValues([rowValues]);
         } finally {
           lock.releaseLock();
@@ -252,7 +241,6 @@ function saveCompleted(data) {
     }
   }
 
-  // Fallback: append a complete Completed row so no data is ever lost
   var subId = data.submissionId || ('SUB' + new Date().getTime());
   sheet.appendRow([
     subId, 'Completed',
@@ -268,7 +256,6 @@ function saveCompleted(data) {
 }
 
 // ─── updateVideoProgress ─────────────────────────────────────────────────────
-// Called every 30s during video and on tab hide. Updates Video % on the Started row.
 
 function updateVideoProgress(data) {
   if (!data.submissionId) return {success: false};
@@ -288,7 +275,6 @@ function updateVideoProgress(data) {
 }
 
 // ─── getCompletedCourses ──────────────────────────────────────────────────────
-// Returns only rows with Status = Completed for the given student.
 
 function getCompletedCourses(studentId) {
   if (!studentId) return {success: true, courses: []};
@@ -308,7 +294,7 @@ function getCompletedCourses(studentId) {
         courseId:    String(rows[i][5]),
         courseName:  String(rows[i][6]),
         category:    String(rows[i][7]),
-        submittedAt: String(rows[i][9])  // Completed At
+        submittedAt: String(rows[i][9])
       });
     }
   }
@@ -336,7 +322,6 @@ function getAllCourses() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Run ONCE from the Apps Script editor to set up all sheets with demo data.
-// Select this function in the dropdown and click Run.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function setupDemoData() {
@@ -347,110 +332,197 @@ function setupDemoData() {
   var s1 = ss.getSheetByName(SHEET_STUDENTS) || ss.insertSheet(SHEET_STUDENTS);
   s1.clearContents();
   s1.getRange(1, 1, 9, 4).setValues([
-    ['Unique ID',  'Name',           'School',                  'Phone'],
-    ['STU001',     'Ravi Kumar',     'St. Johns School',        '9876543210'],
-    ['STU002',     'Priya Singh',    'Delhi Public School',     '9765432109'],
-    ['STU003',     'Arjun Mehta',    'Kendriya Vidyalaya',      '9654321098'],
-    ['STU004',     'Sunita Patel',   'Modern School',           '9543210987'],
-    ['STU005',     'Rahul Sharma',   'St. Marys School',        '9432109876'],
-    ['STU006',     'Anjali Nair',    'Presidency School',       '9321098765'],
-    ['STU007',     'Vikram Joshi',   'Ryan International',      '9210987654'],
-    ['STU008',     'Meera Reddy',    'Lotus Valley School',     '9109876543']
+    ['Unique ID', 'Name',          'School',               'Phone'],
+    ['STU001',    'Ravi Kumar',    'St. Johns School',     '9876543210'],
+    ['STU002',    'Priya Singh',   'Delhi Public School',  '9765432109'],
+    ['STU003',    'Arjun Mehta',   'Kendriya Vidyalaya',   '9654321098'],
+    ['STU004',    'Sunita Patel',  'Modern School',        '9543210987'],
+    ['STU005',    'Rahul Sharma',  'St. Marys School',     '9432109876'],
+    ['STU006',    'Anjali Nair',   'Presidency School',    '9321098765'],
+    ['STU007',    'Vikram Joshi',  'Ryan International',   '9210987654'],
+    ['STU008',    'Meera Reddy',   'Lotus Valley School',  '9109876543']
   ]);
 
-  // ── Sheet 2: Course Control Panel ────────────────────────────────────────
+  // ── Sheet 2: Course Control Panel (44 columns, 5 per question) ───────────
 
   var s2 = ss.getSheetByName(SHEET_COURSES) || ss.insertSheet(SHEET_COURSES);
   s2.clearContents();
 
   var hdr = [
     'Course ID','Category','Course Name','Video URL',
-    'Pre Q1 Text','Pre Q1 Type','Pre Q1 Options',
-    'Pre Q2 Text','Pre Q2 Type','Pre Q2 Options',
-    'Pre Q3 Text','Pre Q3 Type','Pre Q3 Options',
-    'Pre Q4 Text','Pre Q4 Type','Pre Q4 Options',
-    'Post Q1 Text','Post Q1 Type','Post Q1 Options',
-    'Post Q2 Text','Post Q2 Type','Post Q2 Options',
-    'Post Q3 Text','Post Q3 Type','Post Q3 Options',
-    'Post Q4 Text','Post Q4 Type','Post Q4 Options'
+    'Pre Q1 Text','Pre Q1 Type','Pre Q1 Options','Pre Q1 Correct','Pre Q1 Rationale',
+    'Pre Q2 Text','Pre Q2 Type','Pre Q2 Options','Pre Q2 Correct','Pre Q2 Rationale',
+    'Pre Q3 Text','Pre Q3 Type','Pre Q3 Options','Pre Q3 Correct','Pre Q3 Rationale',
+    'Pre Q4 Text','Pre Q4 Type','Pre Q4 Options','Pre Q4 Correct','Pre Q4 Rationale',
+    'Post Q1 Text','Post Q1 Type','Post Q1 Options','Post Q1 Correct','Post Q1 Rationale',
+    'Post Q2 Text','Post Q2 Type','Post Q2 Options','Post Q2 Correct','Post Q2 Rationale',
+    'Post Q3 Text','Post Q3 Type','Post Q3 Options','Post Q3 Correct','Post Q3 Rationale',
+    'Post Q4 Text','Post Q4 Type','Post Q4 Options','Post Q4 Correct','Post Q4 Rationale'
   ];
   s2.getRange(1, 1, 1, hdr.length).setValues([hdr]);
 
+  // Each course row: 4 base + 4 pre × 5 + 4 post × 5 = 44 columns
   var courses = [
+
+    // C001 — Fire Safety
     ['C001','Safety Training','Fire Safety','https://www.youtube.com/watch?v=VIDEO_ID_HERE',
+     // Pre Q1
      'What is the primary purpose of a fire extinguisher?','mcq',
-       'To prevent fires|To put out small fires|To call for help|To alert others',
+     'To prevent fires|To put out small fires|To call for help|To alert others',
+     'To put out small fires',
+     'Fire extinguishers suppress small, contained fires only. For large fires, evacuate immediately and call emergency services.',
+     // Pre Q2
      'Which of the following are fire hazards? Select all that apply.','multiselect',
-       'Overloaded electrical outlets|Unattended candles|Open flames near combustibles|Blocked fire exits',
-     'Describe what you would do if you discovered a fire in your workplace.','text','',
-     'How would you rate your current fire safety knowledge? (1 = Very low, 5 = Very high)','rating','',
+     'Overloaded electrical outlets|Unattended candles|Open flames near combustibles|Blocked fire exits',
+     'Overloaded electrical outlets|Unattended candles|Open flames near combustibles|Blocked fire exits',
+     'All four are recognised fire hazards. Overloaded outlets cause electrical fires, unattended flames can ignite surroundings, and blocked exits prevent safe evacuation.',
+     // Pre Q3
+     'Describe what you would do if you discovered a fire in your workplace.','text','','','',
+     // Pre Q4
+     'How would you rate your current fire safety knowledge? (1 = Very low, 5 = Very high)','rating','','','',
+     // Post Q1
      'What does PASS stand for when using a fire extinguisher?','mcq',
-       'Pull Aim Squeeze Sweep|Push Activate Spray Stop|Position Activate Suppress Secure|Press Alert Stand Signal',
+     'Pull Aim Squeeze Sweep|Push Activate Spray Stop|Position Activate Suppress Secure|Press Alert Stand Signal',
+     'Pull Aim Squeeze Sweep',
+     'PASS is the standard technique: Pull the pin, Aim at the base of the fire, Squeeze the handle, and Sweep side to side until the fire is out.',
+     // Post Q2
      'Which actions should you take during a fire evacuation? Select all that apply.','multiselect',
-       'Close doors as you leave|Follow marked evacuation routes|Alert colleagues on your way out|Use the nearest lift',
-     'What are the three elements of the fire triangle?','text','',
-     'How confident do you feel about responding to a fire emergency now? (1 = Not confident, 5 = Very confident)','rating',''],
+     'Close doors as you leave|Follow marked evacuation routes|Alert colleagues on your way out|Use the nearest lift',
+     'Close doors as you leave|Follow marked evacuation routes|Alert colleagues on your way out',
+     'Closing doors slows fire and smoke spread. Evacuation routes lead to safety. Alerting colleagues saves lives. Never use the lift — it may malfunction or open at the fire floor.',
+     // Post Q3
+     'What are the three elements of the fire triangle?','text','','','',
+     // Post Q4
+     'How confident do you feel about responding to a fire emergency now? (1 = Not confident, 5 = Very confident)','rating','','',''],
 
+    // C002 — First Aid Basics
     ['C002','Safety Training','First Aid Basics','https://www.youtube.com/watch?v=VIDEO_ID_HERE',
+     // Pre Q1
      'What does CPR stand for?','mcq',
-       'Cardio Pulmonary Resuscitation|Critical Patient Response|Cardiac Pressure Relief|Controlled Pulse Recovery',
+     'Cardio Pulmonary Resuscitation|Critical Patient Response|Cardiac Pressure Relief|Controlled Pulse Recovery',
+     'Cardio Pulmonary Resuscitation',
+     'CPR stands for Cardio Pulmonary Resuscitation — a life-saving technique combining chest compressions and rescue breaths to maintain blood flow when the heart stops.',
+     // Pre Q2
      'Which of the following are signs of a heart attack? Select all that apply.','multiselect',
-       'Chest pain or discomfort|Shortness of breath|Pain in arm or jaw|Sudden fatigue or nausea',
-     'Describe the steps you would take if you found someone unconscious.','text','',
-     'How confident are you in your ability to provide first aid? (1 = Not confident, 5 = Very confident)','rating','',
+     'Chest pain or discomfort|Shortness of breath|Pain in arm or jaw|Sudden fatigue or nausea',
+     'Chest pain or discomfort|Shortness of breath|Pain in arm or jaw|Sudden fatigue or nausea',
+     'All four are classic heart attack warning signs. Chest pain is the most common, but heart attacks can present differently in different people — especially women.',
+     // Pre Q3
+     'Describe the steps you would take if you found someone unconscious.','text','','','',
+     // Pre Q4
+     'How confident are you in your ability to provide first aid? (1 = Not confident, 5 = Very confident)','rating','','','',
+     // Post Q1
      'What is the correct compression-to-breath ratio in adult CPR?','mcq',
-       '30:2|15:2|20:2|10:1',
+     '30:2|15:2|20:2|10:1',
+     '30:2',
+     'The internationally recommended ratio is 30 chest compressions followed by 2 rescue breaths. Push hard and fast — at least 5 cm deep at 100–120 compressions per minute.',
+     // Post Q2
      'When should you call emergency services? Select all that apply.','multiselect',
-       'When someone is unconscious|When someone cannot breathe|When someone is bleeding severely|When someone has a minor cut',
-     'What does DRABC stand for in first aid?','text','',
-     'How prepared do you feel to handle a medical emergency at work? (1 = Not prepared, 5 = Very prepared)','rating',''],
+     'When someone is unconscious|When someone cannot breathe|When someone is bleeding severely|When someone has a minor cut',
+     'When someone is unconscious|When someone cannot breathe|When someone is bleeding severely',
+     'Unconsciousness, breathing failure, and severe bleeding are all life-threatening emergencies requiring immediate professional help. A minor cut can be treated with basic first aid.',
+     // Post Q3
+     'What does DRABC stand for in first aid?','text','','','',
+     // Post Q4
+     'How prepared do you feel to handle a medical emergency at work? (1 = Not prepared, 5 = Very prepared)','rating','','',''],
 
+    // C003 — Communication Skills
     ['C003','Soft Skills','Communication Skills','https://www.youtube.com/watch?v=VIDEO_ID_HERE',
+     // Pre Q1
      'What is the most important element of effective communication?','mcq',
-       'Speaking loudly and clearly|Active listening|Using technical language|Talking frequently',
+     'Speaking loudly and clearly|Active listening|Using technical language|Talking frequently',
+     'Active listening',
+     'Active listening is the foundation of effective communication. It shows respect, builds trust, and ensures you fully understand before responding.',
+     // Pre Q2
      'Which of the following are examples of non-verbal communication? Select all that apply.','multiselect',
-       'Eye contact|Facial expressions|Body posture|Tone of voice',
-     'Describe a time when poor communication caused a problem and how it could have been avoided.','text','',
-     'How effective do you consider yourself as a communicator? (1 = Not effective, 5 = Very effective)','rating','',
+     'Eye contact|Facial expressions|Body posture|Tone of voice',
+     'Eye contact|Facial expressions|Body posture|Tone of voice',
+     'All four are non-verbal cues. Studies show that non-verbal communication accounts for over 55% of the meaning in face-to-face interactions.',
+     // Pre Q3
+     'Describe a time when poor communication caused a problem and how it could have been avoided.','text','','','',
+     // Pre Q4
+     'How effective do you consider yourself as a communicator? (1 = Not effective, 5 = Very effective)','rating','','','',
+     // Post Q1
      'Which listening technique involves repeating back what you heard to confirm understanding?','mcq',
-       'Passive listening|Reflective listening|Selective listening|Critical listening',
+     'Passive listening|Reflective listening|Selective listening|Critical listening',
+     'Reflective listening',
+     'Reflective listening involves paraphrasing or summarising what the speaker said to confirm you understood correctly. It reduces miscommunication and makes the speaker feel heard.',
+     // Post Q2
      'What are key principles of assertive communication? Select all that apply.','multiselect',
-       'Expressing your needs clearly|Respecting others views|Using I statements|Avoiding all disagreement',
-     'What is one communication skill you would like to improve and why?','text','',
-     'How much has this training improved your understanding of effective communication? (1 = Not at all, 5 = Greatly)','rating',''],
+     'Expressing your needs clearly|Respecting others views|Using I statements|Avoiding all disagreement',
+     'Expressing your needs clearly|Respecting others views|Using I statements',
+     'Assertive communication means expressing yourself clearly and confidently while respecting others. Avoiding all disagreement is passive, not assertive — healthy disagreement is part of good communication.',
+     // Post Q3
+     'What is one communication skill you would like to improve and why?','text','','','',
+     // Post Q4
+     'How much has this training improved your understanding of effective communication? (1 = Not at all, 5 = Greatly)','rating','','',''],
 
+    // C004 — Teamwork Essentials
     ['C004','Soft Skills','Teamwork Essentials','https://www.youtube.com/watch?v=VIDEO_ID_HERE',
+     // Pre Q1
      'What is the most important factor for a successful team?','mcq',
-       'Having the most skilled individuals|Clear communication and mutual trust|A strong leader who decides everything|Avoiding all conflict',
+     'Having the most skilled individuals|Clear communication and mutual trust|A strong leader who decides everything|Avoiding all conflict',
+     'Clear communication and mutual trust',
+     'Skills alone do not make a team succeed. Clear communication ensures everyone is aligned, and mutual trust allows members to rely on each other and take risks together.',
+     // Pre Q2
      'Which behaviours strengthen a team? Select all that apply.','multiselect',
-       'Sharing credit for success|Communicating openly|Supporting teammates|Competing for individual recognition',
-     'Describe a time you worked effectively in a team. What made it successful?','text','',
-     'How well do you currently work in a team environment? (1 = Not well, 5 = Extremely well)','rating','',
+     'Sharing credit for success|Communicating openly|Supporting teammates|Competing for individual recognition',
+     'Sharing credit for success|Communicating openly|Supporting teammates',
+     'Sharing credit, open communication, and supporting teammates build a collaborative culture. Competing for individual recognition undermines team cohesion and trust.',
+     // Pre Q3
+     'Describe a time you worked effectively in a team. What made it successful?','text','','','',
+     // Pre Q4
+     'How well do you currently work in a team environment? (1 = Not well, 5 = Extremely well)','rating','','','',
+     // Post Q1
      'What is the best way to handle conflict within a team?','mcq',
-       'Ignore it and hope it resolves|Address it privately and respectfully|Escalate to management immediately|Side with the majority',
+     'Ignore it and hope it resolves|Address it privately and respectfully|Escalate to management immediately|Side with the majority',
+     'Address it privately and respectfully',
+     'Unresolved conflict grows over time. Addressing it privately and respectfully allows both parties to express their views without embarrassment, and often leads to stronger relationships.',
+     // Post Q2
      'What responsibilities does every team member share? Select all that apply.','multiselect',
-       'Meeting deadlines|Contributing ideas|Supporting others|Attending team meetings',
-     'What is one change you can make to be a better team member starting from tomorrow?','text','',
-     'How much did this training improve your approach to teamwork? (1 = Not at all, 5 = Significantly)','rating',''],
+     'Meeting deadlines|Contributing ideas|Supporting others|Attending team meetings',
+     'Meeting deadlines|Contributing ideas|Supporting others|Attending team meetings',
+     'All four are shared responsibilities in a healthy team. Every member contributes to the team\'s success — not just the leader.',
+     // Post Q3
+     'What is one change you can make to be a better team member starting from tomorrow?','text','','','',
+     // Post Q4
+     'How much did this training improve your approach to teamwork? (1 = Not at all, 5 = Significantly)','rating','','',''],
 
+    // C005 — Machine Operation Safety
     ['C005','Technical Skills','Machine Operation Safety','https://www.youtube.com/watch?v=VIDEO_ID_HERE',
+     // Pre Q1
      'What should you do before operating any machine for the first time?','mcq',
-       'Start it and figure it out|Read the manual and get proper training|Ask a nearby colleague|Skip training if it looks simple',
+     'Start it and figure it out|Read the manual and get proper training|Ask a nearby colleague|Skip training if it looks simple',
+     'Read the manual and get proper training',
+     'Every machine has specific operating procedures and hazards. Reading the manual and getting proper training prevents accidents and ensures the machine is used correctly and safely.',
+     // Pre Q2
      'Which are essential PPE items for machine operation? Select all that apply.','multiselect',
-       'Safety goggles|Steel-toed boots|Hearing protection|Loose gloves near rotating parts',
-     'Describe the lockout/tagout (LOTO) procedure and explain why it is important.','text','',
-     'How familiar are you with safe machine operation practices? (1 = Not familiar, 5 = Very familiar)','rating','',
+     'Safety goggles|Steel-toed boots|Hearing protection|Loose gloves near rotating parts',
+     'Safety goggles|Steel-toed boots|Hearing protection',
+     'Safety goggles, steel-toed boots, and hearing protection are essential PPE. Loose gloves near rotating parts are extremely dangerous — they can get caught and pull a hand into the machine.',
+     // Pre Q3
+     'Describe the lockout/tagout (LOTO) procedure and explain why it is important.','text','','','',
+     // Pre Q4
+     'How familiar are you with safe machine operation practices? (1 = Not familiar, 5 = Very familiar)','rating','','','',
+     // Post Q1
      'What should you do if you noticed a machine malfunction during operation?','mcq',
-       'Continue and report it later|Stop the machine immediately and report it|Attempt to fix it yourself|Ignore minor malfunctions',
+     'Continue and report it later|Stop the machine immediately and report it|Attempt to fix it yourself|Ignore minor malfunctions',
+     'Stop the machine immediately and report it',
+     'Any malfunction must be taken seriously. Continuing to operate a faulty machine risks injury. Stop immediately, report to a supervisor, and do not restart until it has been inspected and cleared.',
+     // Post Q2
      'Which checks should be done before operating machinery? Select all that apply.','multiselect',
-       'Check for visible damage or wear|Ensure all guards are in place|Test the emergency stop|Remove guards for better access',
-     'Why is it important to follow machine operation procedures even when they seem unnecessary?','text','',
-     'How confident do you feel about safe machine operation after this training? (1 = Not confident, 5 = Very confident)','rating','']
+     'Check for visible damage or wear|Ensure all guards are in place|Test the emergency stop|Remove guards for better access',
+     'Check for visible damage or wear|Ensure all guards are in place|Test the emergency stop',
+     'Pre-operation checks identify hazards before they cause harm. Guards must never be removed — they are there to protect you. Removing them is both dangerous and against safety regulations.',
+     // Post Q3
+     'Why is it important to follow machine operation procedures even when they seem unnecessary?','text','','','',
+     // Post Q4
+     'How confident do you feel about safe machine operation after this training? (1 = Not confident, 5 = Very confident)','rating','','','']
   ];
 
   s2.getRange(2, 1, courses.length, hdr.length).setValues(courses);
 
-  // ── Sheet 3: Master Tracking Sheet (new 20-column layout) ────────────────
+  // ── Sheet 3: Master Tracking Sheet ───────────────────────────────────────
 
   var s3 = ss.getSheetByName(SHEET_TRACKING) || ss.insertSheet(SHEET_TRACKING);
   s3.clearContents();
@@ -462,15 +534,12 @@ function setupDemoData() {
     'Post Q1', 'Post Q2', 'Post Q3', 'Post Q4'
   ]]);
 
-  Logger.log('Setup complete.');
-  Logger.log('Students: STU001–STU008');
-  Logger.log('Courses: C001–C005');
-  Logger.log('Next: Deploy > New Deployment > Web App, then copy the URL into config.js');
+  Logger.log('Setup complete. 44-column Course Control Panel created.');
+  Logger.log('Students: STU001–STU008 | Courses: C001–C005');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Run this to update the tracking sheet headers on an existing install
-// without clearing data. Only needed if you already have the old layout.
+// Updates tracking sheet headers only (does not clear data).
 // ─────────────────────────────────────────────────────────────────────────────
 
 function updateTrackingHeaders() {
@@ -482,5 +551,5 @@ function updateTrackingHeaders() {
     'Pre Q1', 'Pre Q2', 'Pre Q3', 'Pre Q4',
     'Post Q1', 'Post Q2', 'Post Q3', 'Post Q4'
   ]]);
-  Logger.log('Headers updated. Note: existing data rows use the old column layout and should be cleared.');
+  Logger.log('Headers updated.');
 }
